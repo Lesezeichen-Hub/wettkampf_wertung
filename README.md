@@ -7,11 +7,12 @@ Ein lokales Modul für den [Lesezeichen-Hub](https://github.com/Lesezeichen-Hub)
 - Beliebig viele Namensfelder hinzufügen oder entfernen
 - Zufällige Auslosung der ersten Runde
 - Gewinner je Begegnung direkt anklicken
-- Weitere Paarungen nach gleicher Siegzahl (Gewinner gegen Gewinner)
+- Unentschieden mit ½ Punkt für beide Seiten erfassen
+- Weitere Paarungen nach gleicher Punktzahl (Gewinner gegen Gewinner)
 - Automatisch begrenzte Rundenzahl passend zur Größe des Starterfelds
 - Wiederholte Begegnungen werden nach Möglichkeit vermieden
 - Automatische Freilose bei ungerader Teilnehmerzahl
-- Live-Tabelle mit Siegen, Niederlagen und Buchholz-Wertung
+- Live-Tabelle mit Punkten, Siegen, Remis, Niederlagen und Buchholz-Wertung
 - Verbindliche Endplatzierung von Platz 1 bis n nach der letzten Runde
 - Lokales Fortsetzen nach einem Browser-Neustart
 - Ergebnisexport als Textdatei
@@ -23,11 +24,17 @@ Ein lokales Modul für den [Lesezeichen-Hub](https://github.com/Lesezeichen-Hub)
 
 Die Turnierdaten bleiben ausschließlich im `localStorage` des Browsers. **Neues Turnier** löscht den aktuellen Stand nach einer Sicherheitsabfrage.
 
+Wertungslogik prüfen:
+
+```bash
+node tests/scoring.test.cjs
+```
+
 ## Wertungslogik
 
-Die erste Runde wird vollständig zufällig ausgelost. In späteren Runden werden Teilnehmende nach Siegen gruppiert und innerhalb vergleichbarer Wertungen gemischt. Die Rundenzahl wird aus der Größe des Starterfelds berechnet und ist zusätzlich durch die Zahl möglicher Gegner begrenzt. Danach endet das Turnier automatisch.
+Die erste Runde wird vollständig zufällig ausgelost. Ein Sieg zählt 1 Punkt, ein Unentschieden ½ Punkt und eine Niederlage 0 Punkte. In späteren Runden werden Teilnehmende nach Punkten gruppiert und innerhalb vergleichbarer Wertungen gemischt. Die Rundenzahl wird aus der Größe des Starterfelds berechnet und ist zusätzlich durch die Zahl möglicher Gegner begrenzt. Danach endet das Turnier automatisch.
 
-Die Endplatzierung sortiert nach Siegen, Buchholz-Wertung, wenigen Niederlagen, direktem Vergleich und als letztem eindeutigen Kriterium nach der zufälligen Startreihenfolge.
+Die Endplatzierung sortiert nach Punkten, Buchholz-Wertung, Siegen, wenigen Niederlagen, direktem Vergleich und als letztem eindeutigen Kriterium nach der zufälligen Startreihenfolge.
 
 ### Beispiel mit drei Personen
 

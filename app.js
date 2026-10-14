@@ -65,7 +65,9 @@ function stats() {
   const result = new Map(state.players.map((player) => [player.id, {
     id: player.id,
     name: player.name,
+    points: 0,
     wins: 0,
+    draws: 0,
     losses: 0,
     byes: 0,
     opponents: []
@@ -75,20 +77,29 @@ function stats() {
     if (match.bye) {
       if (match.winnerId) {
         result.get(match.winnerId).wins += 1;
+        result.get(match.winnerId).points += 1;
         result.get(match.winnerId).byes += 1;
       }
       return;
     }
     result.get(match.player1Id).opponents.push(match.player2Id);
     result.get(match.player2Id).opponents.push(match.player1Id);
+    if (match.draw) {
+      result.get(match.player1Id).draws += 1;
+      result.get(match.player2Id).draws += 1;
+      result.get(match.player1Id).points += 0.5;
+      result.get(match.player2Id).points += 0.5;
+      return;
+    }
     if (!match.winnerId) return;
     const loserId = match.winnerId === match.player1Id ? match.player2Id : match.player1Id;
     result.get(match.winnerId).wins += 1;
+    result.get(match.winnerId).points += 1;
     result.get(loserId).losses += 1;
   }));
 
   result.forEach((entry) => {
-    entry.buchholz = entry.opponents.reduce((sum, opponentId) => sum + result.get(opponentId).wins, 0);
+    entry.buchholz = entry.opponents.reduce((sum, opponentId) => sum + result.get(opponentId).points, 0);
   });
   return result;
 }
@@ -96,8 +107,9 @@ function stats() {
 function rankedPlayers() {
   const table = stats();
   return [...table.values()].sort((a, b) =>
-    b.wins - a.wins ||
+    b.points - a.points ||
     b.buchholz - a.buchholz ||
+    b.wins - a.wins ||
     a.losses - b.losses ||
     headToHeadResult(a.id, b.id) ||
     playerSeed(a.id) - playerSeed(b.id)
@@ -144,13 +156,13 @@ function pairPlayers(playerIds, firstRound = false) {
     const table = stats();
     const scoreGroups = new Map();
     pool.forEach((id) => {
-      const wins = table.get(id).wins;
-      if (!scoreGroups.has(wins)) scoreGroups.set(wins, []);
-      scoreGroups.get(wins).push(id);
+      const points = table.get(id).points;
+      if (!scoreGroups.has(points)) scoreGroups.set(points, []);
+      scoreGroups.get(points).push(id);
     });
     pool = [...scoreGroups.keys()]
       .sort((a, b) => b - a)
-      .flatMap((wins) => shuffled(scoreGroups.get(wins)));
+      .flatMap((points) => shuffled(scoreGroups.get(points)));
   }
 
   if (pool.length % 2 === 1) {
@@ -158,7 +170,7 @@ function pairPlayers(playerIds, firstRound = false) {
     const candidates = [...pool].reverse();
     const byeId = candidates.find((id) => table.get(id).byes === 0) || candidates[0];
     pool = pool.filter((id) => id !== byeId);
-    matches.push({ id: uid(), player1Id: byeId, player2Id: null, winnerId: byeId, bye: true });
+    matches.push({ id: uid(), player1Id: byeId, player2Id: null, winnerId: byeId, draw: false, bye: true });
   }
 
   while (pool.length) {
@@ -166,7 +178,7 @@ function pairPlayers(playerIds, firstRound = false) {
     let opponentIndex = pool.findIndex((id) => !havePlayed(player1Id, id));
     if (opponentIndex < 0) opponentIndex = 0;
     const [player2Id] = pool.splice(opponentIndex, 1);
-    matches.push({ id: uid(), player1Id, player2Id, winnerId: null, bye: false });
+    matches.push({ id: uid(), player1Id, player2Id, winnerId: null, draw: false, bye: false });
   }
 
   return matches;
@@ -182,7 +194,7 @@ function startTournament(names) {
 }
 
 function isRoundComplete(round) {
-  return round.matches.every((match) => Boolean(match.winnerId));
+  return round.matches.every((match) => Boolean(match.winnerId) || match.draw === true);
 }
 
 function selectWinner(roundIndex, matchId, winnerId) {
@@ -190,6 +202,17 @@ function selectWinner(roundIndex, matchId, winnerId) {
   const match = state.rounds[roundIndex].matches.find((item) => item.id === matchId);
   if (!match || match.bye) return;
   match.winnerId = match.winnerId === winnerId ? null : winnerId;
+  match.draw = false;
+  persist();
+  renderTournament();
+}
+
+function selectDraw(roundIndex, matchId) {
+  if (roundIndex !== state.rounds.length - 1) return;
+  const match = state.rounds[roundIndex].matches.find((item) => item.id === matchId);
+  if (!match || match.bye) return;
+  match.draw = !match.draw;
+  match.winnerId = null;
   persist();
   renderTournament();
 }
@@ -233,7 +256,7 @@ function renderTournament() {
         const locked = roundIndex !== activeRoundIndex;
         row.append(
           playerButton(match, match.player1Id, locked, roundIndex),
-          Object.assign(document.createElement("span"), { className: "versus", textContent: "GEGEN" }),
+          drawButton(match, locked, roundIndex),
           playerButton(match, match.player2Id, locked, roundIndex)
         );
       }
@@ -254,7 +277,7 @@ function renderTournament() {
   elements.roundMessage.textContent = finished
     ? `Nach ${roundLimit} Runden ist das Turnier beendet. Die Endplatzierung steht fest.`
     : complete
-      ? "Runde vollständig – die nächste Auslosung gruppiert nach Siegen."
+      ? "Runde vollständig – die nächste Auslosung gruppiert nach Punkten."
       : "Wähle in jeder Begegnung den Gewinner aus.";
   elements.tournamentMeta.textContent = `${state.players.length} Teilnehmende · ${state.rounds.length} von ${roundLimit} Runden`;
   elements.rankingTitle.textContent = finished ? "Endplatzierung" : "Tabelle";
@@ -277,7 +300,7 @@ function playerButton(match, playerId, locked, roundIndex) {
   const button = document.createElement("button");
   const selected = match.winnerId === playerId;
   button.type = "button";
-  button.className = `player-choice${selected ? " selected" : ""}${match.winnerId && !selected ? " lost" : ""}`;
+  button.className = `player-choice${selected ? " selected" : ""}${match.winnerId && !selected ? " lost" : ""}${match.draw ? " drawn" : ""}`;
   button.textContent = playerName(playerId);
   button.disabled = locked;
   button.setAttribute("aria-pressed", String(selected));
@@ -285,13 +308,29 @@ function playerButton(match, playerId, locked, roundIndex) {
   return button;
 }
 
+function drawButton(match, locked, roundIndex) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `draw-choice${match.draw ? " selected" : ""}`;
+  button.textContent = "REMIS";
+  button.disabled = locked;
+  button.setAttribute("aria-label", `${playerName(match.player1Id)} gegen ${playerName(match.player2Id)} endet unentschieden`);
+  button.setAttribute("aria-pressed", String(Boolean(match.draw)));
+  button.addEventListener("click", () => selectDraw(roundIndex, match.id));
+  return button;
+}
+
 function renderRanking() {
   elements.ranking.replaceChildren();
   rankedPlayers().forEach((player) => {
     const item = document.createElement("li");
-    item.innerHTML = `<span class="rank-name">${escapeHtml(player.name)}</span><span class="rank-score"><span><strong>${player.wins}</strong> S</span><span>${player.losses} N</span><span>${player.buchholz} BH</span></span>`;
+    item.innerHTML = `<span class="rank-name">${escapeHtml(player.name)}</span><span class="rank-score"><span><strong>${formatScore(player.points)}</strong> P</span><span>${player.wins} S</span><span>${player.draws} R</span><span>${formatScore(player.buchholz)} BH</span></span>`;
     elements.ranking.append(item);
   });
+}
+
+function formatScore(value) {
+  return Number.isInteger(value) ? String(value) : value.toLocaleString("de-DE", { maximumFractionDigits: 1 });
 }
 
 function escapeHtml(value) {
@@ -331,14 +370,14 @@ function exportTournament() {
     `Export: ${new Date().toLocaleString("de-DE")}`,
     "",
     "PLATZIERUNG",
-    ...table.map((player, index) => `${index + 1}. ${player.name} — ${player.wins} Siege, ${player.losses} Niederlagen, ${player.buchholz} Buchholz`),
+    ...table.map((player, index) => `${index + 1}. ${player.name} — ${formatScore(player.points)} Punkte, ${player.wins} Siege, ${player.draws} Remis, ${player.losses} Niederlagen, ${formatScore(player.buchholz)} Buchholz`),
     "",
     "BEGEGNUNGEN",
     ...state.rounds.flatMap((round) => [
       `Runde ${round.number}`,
       ...round.matches.map((match) => match.bye
         ? `  ${playerName(match.player1Id)} — Freilos`
-        : `  ${playerName(match.player1Id)} vs. ${playerName(match.player2Id)} — Sieger: ${match.winnerId ? playerName(match.winnerId) : "offen"}`)
+        : `  ${playerName(match.player1Id)} vs. ${playerName(match.player2Id)} — ${match.draw ? "Unentschieden" : match.winnerId ? `Sieger: ${playerName(match.winnerId)}` : "offen"}`)
     ])
   ];
   const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });

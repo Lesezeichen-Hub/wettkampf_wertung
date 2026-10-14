@@ -1,6 +1,6 @@
 {
-  "version": "1.1.1",
+  "version": "1.2.0",
   "name": "Wettkampfwertung",
-  "description": "Lokale Turnierauslosung mit begrenzter Rundenzahl, eindeutiger Endplatzierung und Paarungen nach dem Schweizer System.",
+  "description": "Lokale Turnierauslosung mit Sieg-, Remis- und Niederlagenwertung, begrenzter Rundenzahl und eindeutiger Endplatzierung.",
   "updated_at": "2026-10-14"
 }
