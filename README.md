@@ -8,9 +8,11 @@ Ein lokales Modul für den [Lesezeichen-Hub](https://github.com/Lesezeichen-Hub)
 - Zufällige Auslosung der ersten Runde
 - Gewinner je Begegnung direkt anklicken
 - Weitere Paarungen nach gleicher Siegzahl (Gewinner gegen Gewinner)
+- Automatisch begrenzte Rundenzahl passend zur Größe des Starterfelds
 - Wiederholte Begegnungen werden nach Möglichkeit vermieden
 - Automatische Freilose bei ungerader Teilnehmerzahl
 - Live-Tabelle mit Siegen, Niederlagen und Buchholz-Wertung
+- Verbindliche Endplatzierung von Platz 1 bis n nach der letzten Runde
 - Lokales Fortsetzen nach einem Browser-Neustart
 - Ergebnisexport als Textdatei
 - Responsive Oberfläche für Desktop und Smartphone
@@ -23,4 +25,6 @@ Die Turnierdaten bleiben ausschließlich im `localStorage` des Browsers. **Neues
 
 ## Wertungslogik
 
-Die erste Runde wird vollständig zufällig ausgelost. In späteren Runden werden Teilnehmende nach Siegen gruppiert und innerhalb vergleichbarer Wertungen gemischt. Die Tabelle sortiert nach Siegen, Buchholz-Wertung, wenigen Niederlagen und zuletzt alphabetisch.
+Die erste Runde wird vollständig zufällig ausgelost. In späteren Runden werden Teilnehmende nach Siegen gruppiert und innerhalb vergleichbarer Wertungen gemischt. Die Rundenzahl wird aus der Größe des Starterfelds berechnet und ist zusätzlich durch die Zahl möglicher Gegner begrenzt. Danach endet das Turnier automatisch.
+
+Die Endplatzierung sortiert nach Siegen, Buchholz-Wertung, wenigen Niederlagen, direktem Vergleich und als letztem eindeutigen Kriterium nach der zufälligen Startreihenfolge.

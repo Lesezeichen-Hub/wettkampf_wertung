@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Wettkampfwertung",
-  "description": "Lokale Turnierauslosung mit dynamischer Teilnehmerliste, Gewinner-/Verliererwertung und Paarungen nach dem Schweizer System.",
+  "description": "Lokale Turnierauslosung mit begrenzter Rundenzahl, eindeutiger Endplatzierung und Paarungen nach dem Schweizer System.",
   "updated_at": "2026-10-14"
 }

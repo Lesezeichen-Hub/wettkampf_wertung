@@ -124,6 +124,13 @@ h1 em { color: var(--mint); font-family: "Fraunces", Georgia, serif; font-weight
 .bye small { color: var(--muted); }
 .next-round-wrap { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
 
+.completion-card { margin-top: 28px; padding: 24px; border: 1px solid rgba(242, 184, 102, 0.28); border-radius: 18px; background: linear-gradient(135deg, rgba(242, 184, 102, 0.1), rgba(104, 215, 160, 0.06)); }
+.completion-card h3 { margin: 0 0 20px; font-size: 1.45rem; }
+.podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.podium-place { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: rgba(13, 18, 16, 0.45); }
+.podium-place span { display: block; margin-bottom: 5px; color: var(--amber); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.podium-place strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .trophy { color: var(--amber); font-size: 1.55rem; }
 .ranking { margin: 0; padding: 0; list-style: none; counter-reset: rank; }
 .ranking li { counter-increment: rank; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 13px 0; border-bottom: 1px solid var(--line); }
@@ -158,6 +165,7 @@ h1 em { color: var(--mint); font-family: "Fraunces", Georgia, serif; font-weight
   .match-number { grid-row: 1 / 4; }
   .versus { grid-column: 2; min-height: 18px; }
   .bye { grid-column: 2; }
+  .podium { grid-template-columns: 1fr; }
   .footer { flex-direction: column; }
 }
 

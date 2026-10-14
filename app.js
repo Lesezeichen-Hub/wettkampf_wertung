@@ -16,7 +16,10 @@ const elements = {
   roundStatus: document.querySelector("#round-status"),
   roundMessage: document.querySelector("#round-message"),
   nextRound: document.querySelector("#next-round"),
-  tournamentMeta: document.querySelector("#tournament-meta")
+  tournamentMeta: document.querySelector("#tournament-meta"),
+  rankingTitle: document.querySelector("#ranking-title"),
+  completionCard: document.querySelector("#completion-card"),
+  podium: document.querySelector("#podium")
 };
 
 function uid() {
@@ -93,8 +96,37 @@ function stats() {
 function rankedPlayers() {
   const table = stats();
   return [...table.values()].sort((a, b) =>
-    b.wins - a.wins || b.buchholz - a.buchholz || a.losses - b.losses || a.name.localeCompare(b.name, "de")
+    b.wins - a.wins ||
+    b.buchholz - a.buchholz ||
+    a.losses - b.losses ||
+    headToHeadResult(a.id, b.id) ||
+    playerSeed(a.id) - playerSeed(b.id)
   );
+}
+
+function playerSeed(id) {
+  return state.players.find((player) => player.id === id)?.seed ?? Number.MAX_SAFE_INTEGER;
+}
+
+function headToHeadResult(idA, idB) {
+  const match = state.rounds
+    .flatMap((round) => round.matches)
+    .find((item) => !item.bye && (
+      (item.player1Id === idA && item.player2Id === idB) ||
+      (item.player1Id === idB && item.player2Id === idA)
+    ));
+  if (!match?.winnerId) return 0;
+  return match.winnerId === idA ? -1 : 1;
+}
+
+function maximumRounds() {
+  const playerCount = state.players.length;
+  if (playerCount <= 2) return 1;
+  return Math.min(playerCount - 1, Math.ceil(Math.log2(playerCount)) + 1);
+}
+
+function tournamentIsComplete() {
+  return state.rounds.length >= maximumRounds() && isRoundComplete(state.rounds.at(-1));
 }
 
 function havePlayed(idA, idB) {
@@ -141,6 +173,7 @@ function pairPlayers(playerIds, firstRound = false) {
 
 function startTournament(names) {
   state.players = names.map((name) => ({ id: uid(), name }));
+  shuffled(state.players).forEach((player, index) => { player.seed = index; });
   state.rounds = [{ number: 1, matches: pairPlayers(state.players.map((player) => player.id), true) }];
   state.createdAt = new Date().toISOString();
   persist();
@@ -162,7 +195,7 @@ function selectWinner(roundIndex, matchId, winnerId) {
 
 function createNextRound() {
   const current = state.rounds.at(-1);
-  if (!current || !isRoundComplete(current)) return;
+  if (!current || !isRoundComplete(current) || state.rounds.length >= maximumRounds()) return;
   state.rounds.push({
     number: state.rounds.length + 1,
     matches: pairPlayers(rankedPlayers().map((player) => player.id))
@@ -211,13 +244,32 @@ function renderTournament() {
   renderRanking();
   const current = state.rounds.at(-1);
   const complete = isRoundComplete(current);
-  elements.roundStatus.textContent = `Runde ${current.number}`;
+  const finished = tournamentIsComplete();
+  const roundLimit = maximumRounds();
+  elements.roundStatus.textContent = finished ? "Beendet" : `Runde ${current.number} von ${roundLimit}`;
+  elements.nextRound.hidden = finished;
   elements.nextRound.disabled = !complete;
   elements.nextRound.textContent = complete ? "Nächste Runde auslosen" : "Ergebnisse fehlen";
-  elements.roundMessage.textContent = complete
-    ? "Runde vollständig – die nächste Auslosung gruppiert nach Siegen."
-    : "Wähle in jeder Begegnung den Gewinner aus.";
-  elements.tournamentMeta.textContent = `${state.players.length} Teilnehmende · ${state.rounds.length} ${state.rounds.length === 1 ? "Runde" : "Runden"}`;
+  elements.roundMessage.textContent = finished
+    ? `Nach ${roundLimit} Runden ist das Turnier beendet. Die Endplatzierung steht fest.`
+    : complete
+      ? "Runde vollständig – die nächste Auslosung gruppiert nach Siegen."
+      : "Wähle in jeder Begegnung den Gewinner aus.";
+  elements.tournamentMeta.textContent = `${state.players.length} Teilnehmende · ${state.rounds.length} von ${roundLimit} Runden`;
+  elements.rankingTitle.textContent = finished ? "Endplatzierung" : "Tabelle";
+  renderCompletion(finished);
+}
+
+function renderCompletion(finished) {
+  elements.completionCard.hidden = !finished;
+  if (!finished) return;
+  elements.podium.replaceChildren();
+  rankedPlayers().slice(0, 3).forEach((player, index) => {
+    const place = document.createElement("div");
+    place.className = "podium-place";
+    place.innerHTML = `<span>Platz ${index + 1}</span><strong>${escapeHtml(player.name)}</strong>`;
+    elements.podium.append(place);
+  });
 }
 
 function playerButton(match, playerId, locked, roundIndex) {
@@ -321,6 +373,16 @@ try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
   if (saved?.players?.length >= 2 && saved?.rounds?.length) {
     Object.assign(state, saved);
+    const usedSeeds = new Set(state.players.map((player) => player.seed).filter(Number.isInteger));
+    state.players.forEach((player, index) => {
+      if (!Number.isInteger(player.seed)) {
+        let seed = index;
+        while (usedSeeds.has(seed)) seed += 1;
+        player.seed = seed;
+        usedSeeds.add(seed);
+      }
+    });
+    persist();
     showTournament();
   } else {
     for (let index = 0; index < 4; index += 1) addPlayerField();
