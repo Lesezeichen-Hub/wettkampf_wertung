@@ -28,3 +28,7 @@ Die Turnierdaten bleiben ausschließlich im `localStorage` des Browsers. **Neues
 Die erste Runde wird vollständig zufällig ausgelost. In späteren Runden werden Teilnehmende nach Siegen gruppiert und innerhalb vergleichbarer Wertungen gemischt. Die Rundenzahl wird aus der Größe des Starterfelds berechnet und ist zusätzlich durch die Zahl möglicher Gegner begrenzt. Danach endet das Turnier automatisch.
 
 Die Endplatzierung sortiert nach Siegen, Buchholz-Wertung, wenigen Niederlagen, direktem Vergleich und als letztem eindeutigen Kriterium nach der zufälligen Startreihenfolge.
+
+### Beispiel mit drei Personen
+
+Bei drei Teilnehmenden werden drei Runden gespielt. In jeder Runde findet eine Begegnung statt und eine Person erhält ein Freilos. Dadurch spielt jede Person genau einmal gegen jede andere und erhält genau einmal ein Freilos. Nach der dritten Runde werden die Plätze 1 bis 3 vergeben.

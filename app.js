@@ -122,7 +122,8 @@ function headToHeadResult(idA, idB) {
 function maximumRounds() {
   const playerCount = state.players.length;
   if (playerCount <= 2) return 1;
-  return Math.min(playerCount - 1, Math.ceil(Math.log2(playerCount)) + 1);
+  const uniquePairingRounds = playerCount % 2 === 0 ? playerCount - 1 : playerCount;
+  return Math.min(uniquePairingRounds, Math.ceil(Math.log2(playerCount)) + 1);
 }
 
 function tournamentIsComplete() {
