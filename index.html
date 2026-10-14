@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a18">
+  <meta name="description" content="Lokale Turnierauslosung mit dynamischer Teilnehmerliste und Platzierungswertung.">
+  <title>Wettkampfwertung · Lesezeichen-Hub</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <header class="hero shell">
+    <a class="brand" href="#top" aria-label="Wettkampfwertung Startseite">
+      <span class="brand-mark" aria-hidden="true">W</span>
+      <span><small>Lesezeichen-Hub Modul</small>Wettkampfwertung</span>
+    </a>
+    <div class="hero-copy" id="top">
+      <p class="eyebrow">Turnierleitung, ganz entspannt</p>
+      <h1>Jede Runde.<br><em>Fair ausgelost.</em></h1>
+      <p>Teilnehmende anlegen, die erste Begegnung mischen und danach Gleichplatzierte gegeneinander antreten lassen.</p>
+    </div>
+    <div class="hero-badge" aria-label="Lokale Datenspeicherung">
+      <span class="pulse"></span>
+      Speichert nur auf diesem Gerät
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="setup panel" id="setup-view" aria-labelledby="setup-title">
+      <div class="section-heading">
+        <div>
+          <p class="step">01 · Starterfeld</p>
+          <h2 id="setup-title">Wer tritt an?</h2>
+        </div>
+        <span class="counter"><strong id="player-count">0</strong> Teilnehmende</span>
+      </div>
+
+      <form id="player-form">
+        <div id="player-list" class="player-list"></div>
+        <div class="setup-actions">
+          <button class="button secondary" id="add-player" type="button">
+            <span aria-hidden="true">＋</span> Namensfeld hinzufügen
+          </button>
+          <button class="button primary" type="submit">
+            <span aria-hidden="true">↝</span> Zufällig auslosen
+          </button>
+        </div>
+        <p class="form-hint" id="form-message" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="tournament" id="tournament-view" hidden>
+      <div class="tournament-toolbar panel">
+        <div>
+          <p class="step">Turnier läuft</p>
+          <h2 id="tournament-title">Wettkampf</h2>
+          <p id="tournament-meta" class="muted"></p>
+        </div>
+        <div class="toolbar-actions">
+          <button class="button secondary compact" id="export-tournament" type="button">Ergebnis exportieren</button>
+          <button class="button danger compact" id="reset-tournament" type="button">Neues Turnier</button>
+        </div>
+      </div>
+
+      <div class="competition-grid">
+        <section class="rounds-panel panel" aria-labelledby="rounds-title">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="step">02 · Begegnungen</p>
+              <h2 id="rounds-title">Spielrunden</h2>
+            </div>
+            <span class="status-pill" id="round-status">Runde 1</span>
+          </div>
+          <div id="rounds" class="rounds"></div>
+          <div class="next-round-wrap">
+            <p id="round-message" class="muted">Trage für jede Begegnung den Gewinner ein.</p>
+            <button class="button primary" id="next-round" type="button" disabled>Nächste Runde auslosen</button>
+          </div>
+        </section>
+
+        <aside class="ranking-panel panel" aria-labelledby="ranking-title">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="step">03 · Platzierung</p>
+              <h2 id="ranking-title">Tabelle</h2>
+            </div>
+            <span class="trophy" aria-hidden="true">♜</span>
+          </div>
+          <ol id="ranking" class="ranking"></ol>
+          <p class="ranking-note">Sortierung nach Siegen, Buchholz-Wertung und Losentscheid.</p>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="shell footer">
+    <span>Wettkampfwertung</span>
+    <span>Für den Lesezeichen-Hub · lokal &amp; offline</span>
+  </footer>
+
+  <template id="player-row-template">
+    <div class="player-row">
+      <span class="player-number" aria-hidden="true"></span>
+      <label>
+        <span class="sr-only">Name der teilnehmenden Person</span>
+        <input class="player-name" type="text" maxlength="60" autocomplete="off" placeholder="Name eingeben">
+      </label>
+      <button class="icon-button remove-player" type="button" aria-label="Teilnehmende Person entfernen">×</button>
+    </div>
+  </template>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
