@@ -1,6 +1,6 @@
 {
-  "version": "1.3.1",
+  "version": "1.3.2",
   "name": "Wettkampfwertung",
-  "description": "Lokale Turnierauslosung mit Schweizer System oder Schachauftakt mit Farbwechsel und Entscheidungsspiel, Sieg-, Remis- und Niederlagenwertung sowie Endplatzierung.",
+  "description": "Lokale Turnierauslosung mit Schweizer System oder Schachauftakt mit Farbwechsel, Entscheidungsspiel und wiederholungsfreien Paarungen, Sieg-, Remis- und Niederlagenwertung sowie Endplatzierung.",
   "updated_at": "2026-10-16"
 }

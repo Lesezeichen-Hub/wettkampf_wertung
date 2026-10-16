@@ -212,11 +212,16 @@ function chessThirdRound() {
   });
 
   const remainingIds = rankedPlayers().map((player) => player.id).filter((id) => !tiedIds.has(id));
-  return [...tieBreaks, ...withChessColors(pairPlayers(remainingIds))];
+  return [...tieBreaks, ...withChessColors(pairPlayers(remainingIds, false, true) || [])];
 }
 
 function tournamentIsComplete() {
-  return state.rounds.length >= maximumRounds() && isRoundComplete(state.rounds.at(-1));
+  const lastRound = state.rounds.at(-1);
+  if (!lastRound || !isRoundComplete(lastRound)) return false;
+  if (state.rounds.length >= maximumRounds()) return true;
+  if (state.mode !== "chess" || state.rounds.length < 2) return false;
+  if (hasPendingChessTiebreak()) return false;
+  return !hasUnplayedPairingRound();
 }
 
 function havePlayed(idA, idB) {
@@ -225,7 +230,45 @@ function havePlayed(idA, idB) {
   ));
 }
 
-function pairPlayers(playerIds, firstRound = false) {
+function findUnplayedPairs(pool) {
+  if (!pool.length) return [];
+  const [player1Id, ...remaining] = pool;
+  for (let index = 0; index < remaining.length; index += 1) {
+    const player2Id = remaining[index];
+    if (havePlayed(player1Id, player2Id)) continue;
+    const rest = remaining.filter((_, restIndex) => restIndex !== index);
+    const pairings = findUnplayedPairs(rest);
+    if (pairings) return [[player1Id, player2Id], ...pairings];
+  }
+  return null;
+}
+
+function hasUnplayedPairingRound() {
+  const playerIds = state.players.map((player) => player.id);
+  const byeCandidates = playerIds.length % 2 === 1 ? playerIds : [null];
+  return byeCandidates.some((byeId) => {
+    const pool = byeId ? playerIds.filter((id) => id !== byeId) : playerIds;
+    return findUnplayedPairs(pool) !== null;
+  });
+}
+
+function hasPendingChessTiebreak() {
+  if (state.rounds.length !== 2) return false;
+  const [firstRound, secondRound] = state.rounds;
+  return firstRound.matches.some((firstGame) => {
+    if (firstGame.bye) return false;
+    const secondGame = secondRound.matches.find((match) => !match.bye &&
+      ((match.player1Id === firstGame.player1Id && match.player2Id === firstGame.player2Id) ||
+       (match.player1Id === firstGame.player2Id && match.player2Id === firstGame.player1Id))
+    );
+    if (!secondGame) return false;
+    const firstScore = chessGamePoints(firstGame, firstGame.player1Id) + chessGamePoints(secondGame, firstGame.player1Id);
+    const secondScore = chessGamePoints(firstGame, firstGame.player2Id) + chessGamePoints(secondGame, firstGame.player2Id);
+    return firstScore === secondScore;
+  });
+}
+
+function pairPlayers(playerIds, firstRound = false, requireUnplayedPairs = false) {
   let pool = firstRound ? shuffled(playerIds) : [...playerIds];
   const matches = [];
 
@@ -240,6 +283,28 @@ function pairPlayers(playerIds, firstRound = false) {
     pool = [...scoreGroups.keys()]
       .sort((a, b) => b - a)
       .flatMap((points) => shuffled(scoreGroups.get(points)));
+  }
+
+  if (requireUnplayedPairs) {
+    const table = stats();
+    const reversedPool = [...pool].reverse();
+    const byeCandidates = pool.length % 2 === 1
+      ? [
+        ...reversedPool.filter((id) => table.get(id).byes === 0),
+        ...reversedPool.filter((id) => table.get(id).byes > 0)
+      ]
+      : [null];
+    for (const byeId of byeCandidates) {
+      const pairingPool = byeId ? pool.filter((id) => id !== byeId) : pool;
+      const pairings = findUnplayedPairs(pairingPool);
+      if (!pairings) continue;
+      const matches = pairings.map(([player1Id, player2Id]) => ({
+        id: uid(), player1Id, player2Id, winnerId: null, draw: false, bye: false
+      }));
+      if (byeId) matches.unshift({ id: uid(), player1Id: byeId, player2Id: null, winnerId: byeId, draw: false, bye: true });
+      return matches;
+    }
+    return null;
   }
 
   if (pool.length % 2 === 1) {
@@ -310,7 +375,7 @@ function createNextRound() {
   } else if (nextRoundNumber === 3) {
     matches = chessThirdRound();
   } else {
-    matches = withChessColors(pairPlayers(rankedPlayers().map((player) => player.id)));
+    matches = withChessColors(pairPlayers(rankedPlayers().map((player) => player.id), false, true) || []);
   }
   state.rounds.push({
     number: nextRoundNumber,

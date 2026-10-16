@@ -8,6 +8,7 @@ Ein lokales Modul für den [Lesezeichen-Hub](https://github.com/Lesezeichen-Hub)
 - Zufällige Auslosung der ersten Runde
 - Wahl zwischen Schweizer System und Schachturnier mit Farbwechsel im Auftakt
 - Ausgeglichene Auftaktduelle erhalten ein Entscheidungsspiel; danach gilt das Schweizer System
+- Im Schachmodus endet das Turnier, wenn keine vollständige Runde mit neuen Gegnerpaarungen mehr möglich ist
 - Gewinner je Begegnung direkt anklicken
 - Unentschieden mit ½ Punkt für beide Seiten erfassen
 - Weitere Paarungen nach gleicher Punktzahl (Gewinner gegen Gewinner)
@@ -34,7 +35,7 @@ node tests/scoring.test.cjs
 
 ## Wertungslogik
 
-Im Schweizer System wird die erste Runde vollständig zufällig ausgelost; spätere Runden gruppieren nach Punkten. Im Schachmodus werden zufällige Auftaktgegner in Runde 2 mit vertauschten Farben erneut gepaart. Wenn ein solches Duell nach zwei Partien ausgeglichen steht, spielen diese beiden in Runde 3 ein Entscheidungsspiel; alle übrigen Teilnehmenden werden in dieser Runde bereits nach Schweizer System gepaart. Ab Runde 4 gilt das Schweizer System für alle. Bei ungerader Teilnehmerzahl gibt es Freilose. Ein Sieg zählt 1 Punkt, ein Unentschieden ½ Punkt und eine Niederlage 0 Punkte. Das Turnier endet nach der für den Modus und das Starterfeld berechneten Rundenzahl.
+Im Schweizer System wird die erste Runde vollständig zufällig ausgelost; spätere Runden gruppieren nach Punkten. Im Schachmodus werden zufällige Auftaktgegner in Runde 2 mit vertauschten Farben erneut gepaart. Wenn ein solches Duell nach zwei Partien ausgeglichen steht, spielen diese beiden in Runde 3 ein Entscheidungsspiel; alle übrigen Teilnehmenden werden in dieser Runde bereits nach Schweizer System gepaart. Ab Runde 4 gilt das Schweizer System für alle, ohne Wiederholung bereits gespielter Gegner, sofern eine vollständige Paarung möglich ist. Bei ungerader Teilnehmerzahl gibt es Freilose. Ein Sieg zählt 1 Punkt, ein Unentschieden ½ Punkt und eine Niederlage 0 Punkte. Das Turnier endet nach der für den Modus und das Starterfeld berechneten Rundenzahl oder vorzeitig, wenn keine neue vollständige Paarungsrunde mehr möglich ist.
 
 Die Endplatzierung sortiert nach Punkten, Buchholz-Wertung, Siegen, wenigen Niederlagen, direktem Vergleich und als letztem eindeutigen Kriterium nach der zufälligen Startreihenfolge. Im Schachmodus fließen Auftakt- und Entscheidungsspiele normal in die Wertung ein.
 

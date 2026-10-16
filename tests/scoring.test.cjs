@@ -105,3 +105,71 @@ assert.ok(thirdRound.some((game) => new Set([game.player1Id, game.player2Id]).ha
 assert.equal(thirdRound.length, 3, "Nicht ausgeglichene Duelle laufen in der dritten Runde in die Schweizer Auslosung.");
 
 console.log("Schachtest bestanden: feste Rückrunde, Entscheidungsspiel und Schweizer Paarungen.");
+
+function createChessPairingModel(state) {
+  const stats = () => new Map(state.players.map((player) => [player.id, {
+    points: 0,
+    byes: state.rounds.flatMap((round) => round.matches)
+      .filter((game) => game.bye && game.player1Id === player.id).length
+  }]));
+  return new Function("state", "uid", "shuffled", "stats", "maximumRounds", "isRoundComplete", `
+    ${functionSource("havePlayed")}
+    ${functionSource("findUnplayedPairs")}
+    ${functionSource("hasUnplayedPairingRound")}
+    ${functionSource("chessGamePoints")}
+    ${functionSource("hasPendingChessTiebreak")}
+    ${functionSource("tournamentIsComplete")}
+    ${functionSource("pairPlayers")}
+    return { pairPlayers, hasUnplayedPairingRound, hasPendingChessTiebreak, tournamentIsComplete };
+  `)(state, () => "generated", (values) => values, stats, () => 5, () => true);
+}
+
+const threePlayerState = {
+  mode: "chess",
+  players: ["a", "b", "c"].map((id) => ({ id })),
+  rounds: [
+    { matches: [
+      { player1Id: "a", player2Id: "b", winnerId: "b", draw: false, bye: false },
+      { player1Id: "c", player2Id: null, winnerId: "c", draw: false, bye: true }
+    ] },
+    { matches: [
+      { player1Id: "b", player2Id: "a", winnerId: "b", draw: false, bye: false },
+      { player1Id: "c", player2Id: null, winnerId: "c", draw: false, bye: true }
+    ] }
+  ]
+};
+const threePlayerModel = createChessPairingModel(threePlayerState);
+assert.equal(threePlayerModel.hasUnplayedPairingRound(), true);
+assert.equal(threePlayerModel.tournamentIsComplete(), false);
+
+const thirdSwissRound = threePlayerModel.pairPlayers(["a", "b", "c"], false, true);
+assert.ok(thirdSwissRound, "Die dritte Runde soll eine noch ungespielte Paarung finden.");
+assert.equal(thirdSwissRound.filter((game) => !game.bye).length, 1);
+assert.ok(thirdSwissRound.every((game) => game.bye || ![
+  ["a", "b"], ["b", "a"]
+].some(([first, second]) => game.player1Id === first && game.player2Id === second)));
+threePlayerState.rounds.push({ matches: thirdSwissRound.map((game) => game.bye
+  ? game
+  : { ...game, winnerId: game.player1Id }) });
+
+const fourthSwissRound = threePlayerModel.pairPlayers(["a", "b", "c"], false, true);
+assert.ok(fourthSwissRound, "Die vierte Runde soll das letzte ungespielte Paar ansetzen.");
+threePlayerState.rounds.push({ matches: fourthSwissRound.map((game) => game.bye
+  ? game
+  : { ...game, winnerId: game.player1Id }) });
+assert.equal(threePlayerModel.hasUnplayedPairingRound(), false);
+assert.equal(threePlayerModel.tournamentIsComplete(), true, "Nach allen unterschiedlichen Gegnerpaarungen endet das Dreierturnier vor der Maximalrundenzahl.");
+
+const tiedOpeningModel = createChessPairingModel({
+  mode: "chess",
+  players: [{ id: "a" }, { id: "b" }],
+  rounds: [
+    { matches: [{ player1Id: "a", player2Id: "b", winnerId: null, draw: true, bye: false }] },
+    { matches: [{ player1Id: "b", player2Id: "a", winnerId: null, draw: true, bye: false }] }
+  ]
+});
+assert.equal(tiedOpeningModel.hasUnplayedPairingRound(), false);
+assert.equal(tiedOpeningModel.hasPendingChessTiebreak(), true);
+assert.equal(tiedOpeningModel.tournamentIsComplete(), false, "Ein ausgeglichenes Auftaktduell muss trotz ausgeschöpfter Gegner ein Entscheidungsspiel erhalten.");
+
+console.log("Schachtest bestanden: keine Wiederholungen nach Auftakt, früher Abschluss und Entscheidungsspiel.");
