@@ -1,7 +1,7 @@
 "use strict";
 
 const STORAGE_KEY = "wettkampfwertung.v1";
-const state = { players: [], rounds: [], createdAt: null };
+const state = { players: [], rounds: [], createdAt: null, mode: "swiss" };
 
 const elements = {
   setupView: document.querySelector("#setup-view"),
@@ -10,6 +10,7 @@ const elements = {
   playerList: document.querySelector("#player-list"),
   playerTemplate: document.querySelector("#player-row-template"),
   playerCount: document.querySelector("#player-count"),
+  tournamentMode: document.querySelector("#tournament-mode"),
   formMessage: document.querySelector("#form-message"),
   rounds: document.querySelector("#rounds"),
   ranking: document.querySelector("#ranking"),
@@ -121,21 +122,64 @@ function playerSeed(id) {
 }
 
 function headToHeadResult(idA, idB) {
-  const match = state.rounds
+  const matches = state.rounds
     .flatMap((round) => round.matches)
-    .find((item) => !item.bye && (
+    .filter((item) => !item.bye && (
       (item.player1Id === idA && item.player2Id === idB) ||
       (item.player1Id === idB && item.player2Id === idA)
     ));
-  if (!match?.winnerId) return 0;
-  return match.winnerId === idA ? -1 : 1;
+  let scoreA = 0;
+  let scoreB = 0;
+  matches.forEach((match) => {
+    if (match.draw) {
+      scoreA += 0.5;
+      scoreB += 0.5;
+    } else if (match.winnerId === idA) scoreA += 1;
+    else if (match.winnerId === idB) scoreB += 1;
+  });
+  return scoreA === scoreB ? 0 : scoreA > scoreB ? -1 : 1;
 }
 
 function maximumRounds() {
   const playerCount = state.players.length;
+  if (state.mode === "chess") return (playerCount % 2 === 0 ? playerCount - 1 : playerCount) * 2;
   if (playerCount <= 2) return 1;
   const uniquePairingRounds = playerCount % 2 === 0 ? playerCount - 1 : playerCount;
   return Math.min(uniquePairingRounds, Math.ceil(Math.log2(playerCount)) + 1);
+}
+
+function chessRound(roundNumber) {
+  const playerIds = state.players.map((player) => player.id);
+  const hasBye = playerIds.length % 2 === 1;
+  const baseRounds = hasBye ? playerIds.length : playerIds.length - 1;
+  const returnLeg = roundNumber > baseRounds;
+  const baseRound = (roundNumber - 1) % baseRounds;
+  const circle = [...playerIds];
+  if (hasBye) circle.push(null);
+
+  for (let index = 0; index < baseRound; index += 1) {
+    circle.splice(1, 0, circle.pop());
+  }
+
+  const matches = [];
+  for (let index = 0; index < circle.length / 2; index += 1) {
+    const first = circle[index];
+    const second = circle[circle.length - 1 - index];
+    if (!first || !second) {
+      const playerId = first || second;
+      matches.push({ id: uid(), player1Id: playerId, player2Id: null, winnerId: playerId, draw: false, bye: true });
+      continue;
+    }
+
+    const firstIsWhite = ((baseRound + index) % 2 === 0) !== returnLeg;
+    const whiteId = firstIsWhite ? first : second;
+    const blackId = firstIsWhite ? second : first;
+    matches.push({
+      id: uid(), player1Id: whiteId, player2Id: blackId, whiteId, blackId,
+      winnerId: null, draw: false, bye: false
+    });
+  }
+  return matches;
 }
 
 function tournamentIsComplete() {
@@ -184,10 +228,14 @@ function pairPlayers(playerIds, firstRound = false) {
   return matches;
 }
 
-function startTournament(names) {
+function startTournament(names, mode) {
+  state.mode = mode;
   state.players = names.map((name) => ({ id: uid(), name }));
   shuffled(state.players).forEach((player, index) => { player.seed = index; });
-  state.rounds = [{ number: 1, matches: pairPlayers(state.players.map((player) => player.id), true) }];
+  state.rounds = [{
+    number: 1,
+    matches: state.mode === "chess" ? chessRound(1) : pairPlayers(state.players.map((player) => player.id), true)
+  }];
   state.createdAt = new Date().toISOString();
   persist();
   showTournament();
@@ -222,7 +270,9 @@ function createNextRound() {
   if (!current || !isRoundComplete(current) || state.rounds.length >= maximumRounds()) return;
   state.rounds.push({
     number: state.rounds.length + 1,
-    matches: pairPlayers(rankedPlayers().map((player) => player.id))
+    matches: state.mode === "chess"
+      ? chessRound(state.rounds.length + 1)
+      : pairPlayers(rankedPlayers().map((player) => player.id))
   });
   persist();
   renderTournament();
@@ -302,6 +352,12 @@ function playerButton(match, playerId, locked, roundIndex) {
   button.type = "button";
   button.className = `player-choice${selected ? " selected" : ""}${match.winnerId && !selected ? " lost" : ""}${match.draw ? " drawn" : ""}`;
   button.textContent = playerName(playerId);
+  if (state.mode === "chess") {
+    const color = document.createElement("span");
+    color.className = "side-label";
+    color.textContent = match.whiteId === playerId ? "Weiß" : "Schwarz";
+    button.append(color);
+  }
   button.disabled = locked;
   button.setAttribute("aria-pressed", String(selected));
   button.addEventListener("click", () => selectWinner(roundIndex, match.id, playerId));
@@ -355,6 +411,8 @@ function resetTournament() {
   state.players = [];
   state.rounds = [];
   state.createdAt = null;
+  state.mode = "swiss";
+  elements.tournamentMode.value = "swiss";
   elements.playerList.replaceChildren();
   for (let index = 0; index < 4; index += 1) addPlayerField();
   elements.tournamentView.hidden = true;
@@ -377,7 +435,7 @@ function exportTournament() {
       `Runde ${round.number}`,
       ...round.matches.map((match) => match.bye
         ? `  ${playerName(match.player1Id)} — Freilos`
-        : `  ${playerName(match.player1Id)} vs. ${playerName(match.player2Id)} — ${match.draw ? "Unentschieden" : match.winnerId ? `Sieger: ${playerName(match.winnerId)}` : "offen"}`)
+        : `  ${state.mode === "chess" ? `Weiß: ${playerName(match.whiteId)} · Schwarz: ${playerName(match.blackId)}` : `${playerName(match.player1Id)} vs. ${playerName(match.player2Id)}`} — ${match.draw ? "Unentschieden" : match.winnerId ? `Sieger: ${playerName(match.winnerId)}` : "offen"}`)
     ])
   ];
   const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
@@ -401,7 +459,7 @@ elements.playerForm.addEventListener("submit", (event) => {
     return;
   }
   elements.formMessage.textContent = "";
-  startTournament(names);
+  startTournament(names, elements.tournamentMode.value);
 });
 
 document.querySelector("#add-player").addEventListener("click", () => addPlayerField("", true));
@@ -413,6 +471,8 @@ try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
   if (saved?.players?.length >= 2 && saved?.rounds?.length) {
     Object.assign(state, saved);
+    state.mode = state.mode === "chess" ? "chess" : "swiss";
+    elements.tournamentMode.value = state.mode;
     const usedSeeds = new Set(state.players.map((player) => player.seed).filter(Number.isInteger));
     state.players.forEach((player, index) => {
       if (!Number.isInteger(player.seed)) {

@@ -1,11 +1,13 @@
 # Wettkampfwertung
 
-Ein lokales Modul für den [Lesezeichen-Hub](https://github.com/Lesezeichen-Hub): Teilnehmende erfassen, zufällige Erstbegegnungen auslosen, Gewinner festhalten und weitere Runden nach dem Schweizer System bilden.
+Ein lokales Modul für den [Lesezeichen-Hub](https://github.com/Lesezeichen-Hub): Teilnehmende erfassen, Begegnungen auslosen, Ergebnisse festhalten und die Endplatzierung ermitteln.
 
 ## Funktionen
 
 - Beliebig viele Namensfelder hinzufügen oder entfernen
 - Zufällige Auslosung der ersten Runde
+- Wahl zwischen Schweizer System und Schach-Doppelrundenturnier
+- Im Schachmodus spielt jedes Paar Hin- und Rückrunde mit getauschten Farben
 - Gewinner je Begegnung direkt anklicken
 - Unentschieden mit ½ Punkt für beide Seiten erfassen
 - Weitere Paarungen nach gleicher Punktzahl (Gewinner gegen Gewinner)
@@ -32,9 +34,9 @@ node tests/scoring.test.cjs
 
 ## Wertungslogik
 
-Die erste Runde wird vollständig zufällig ausgelost. Ein Sieg zählt 1 Punkt, ein Unentschieden ½ Punkt und eine Niederlage 0 Punkte. In späteren Runden werden Teilnehmende nach Punkten gruppiert und innerhalb vergleichbarer Wertungen gemischt. Die Rundenzahl wird aus der Größe des Starterfelds berechnet und ist zusätzlich durch die Zahl möglicher Gegner begrenzt. Danach endet das Turnier automatisch.
+Im Schweizer System wird die erste Runde vollständig zufällig ausgelost; spätere Runden gruppieren nach Punkten. Im Schachmodus spielt jede Person gegen jede andere zweimal, einmal mit Weiß und einmal mit Schwarz. Bei ungerader Teilnehmerzahl gibt es pro Runde ein Freilos. Ein Sieg zählt 1 Punkt, ein Unentschieden ½ Punkt und eine Niederlage 0 Punkte. Das Turnier endet nach der für den Modus und das Starterfeld berechneten Rundenzahl.
 
-Die Endplatzierung sortiert nach Punkten, Buchholz-Wertung, Siegen, wenigen Niederlagen, direktem Vergleich und als letztem eindeutigen Kriterium nach der zufälligen Startreihenfolge.
+Die Endplatzierung sortiert nach Punkten, Buchholz-Wertung, Siegen, wenigen Niederlagen, direktem Vergleich und als letztem eindeutigen Kriterium nach der zufälligen Startreihenfolge. Im Schach-Doppelrundenturnier berücksichtigt der direkte Vergleich beide Partien.
 
 ### Beispiel mit drei Personen
 
