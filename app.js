@@ -142,44 +142,77 @@ function headToHeadResult(idA, idB) {
 
 function maximumRounds() {
   const playerCount = state.players.length;
-  if (state.mode === "chess") return (playerCount % 2 === 0 ? playerCount - 1 : playerCount) * 2;
-  if (playerCount <= 2) return 1;
   const uniquePairingRounds = playerCount % 2 === 0 ? playerCount - 1 : playerCount;
-  return Math.min(uniquePairingRounds, Math.ceil(Math.log2(playerCount)) + 1);
+  const swissRounds = playerCount <= 2
+    ? 1
+    : Math.min(uniquePairingRounds, Math.ceil(Math.log2(playerCount)) + 1);
+  return state.mode === "chess" ? swissRounds + 2 : swissRounds;
 }
 
-function chessRound(roundNumber) {
-  const playerIds = state.players.map((player) => player.id);
-  const hasBye = playerIds.length % 2 === 1;
-  const baseRounds = hasBye ? playerIds.length : playerIds.length - 1;
-  const returnLeg = roundNumber > baseRounds;
-  const baseRound = (roundNumber - 1) % baseRounds;
-  const circle = [...playerIds];
-  if (hasBye) circle.push(null);
+function chessGame(player1Id, player2Id) {
+  const firstIsWhite = Math.random() < 0.5;
+  const whiteId = firstIsWhite ? player1Id : player2Id;
+  const blackId = firstIsWhite ? player2Id : player1Id;
+  return {
+    id: uid(), player1Id: whiteId, player2Id: blackId, whiteId, blackId,
+    winnerId: null, draw: false, bye: false
+  };
+}
 
-  for (let index = 0; index < baseRound; index += 1) {
-    circle.splice(1, 0, circle.pop());
-  }
-
+function initialChessRound() {
+  const pool = shuffled(state.players.map((player) => player.id));
   const matches = [];
-  for (let index = 0; index < circle.length / 2; index += 1) {
-    const first = circle[index];
-    const second = circle[circle.length - 1 - index];
-    if (!first || !second) {
-      const playerId = first || second;
-      matches.push({ id: uid(), player1Id: playerId, player2Id: null, winnerId: playerId, draw: false, bye: true });
-      continue;
-    }
+  if (pool.length % 2 === 1) {
+    const playerId = pool.pop();
+    matches.push({ id: uid(), player1Id: playerId, player2Id: null, winnerId: playerId, draw: false, bye: true });
+  }
+  while (pool.length) matches.push(chessGame(pool.shift(), pool.shift()));
+  return matches;
+}
 
-    const firstIsWhite = ((baseRound + index) % 2 === 0) !== returnLeg;
-    const whiteId = firstIsWhite ? first : second;
-    const blackId = firstIsWhite ? second : first;
-    matches.push({
-      id: uid(), player1Id: whiteId, player2Id: blackId, whiteId, blackId,
+function chessReturnRound() {
+  return state.rounds[0].matches.map((match) => match.bye
+    ? { ...match, id: uid() }
+    : {
+      id: uid(), player1Id: match.blackId, player2Id: match.whiteId,
+      whiteId: match.blackId, blackId: match.whiteId,
       winnerId: null, draw: false, bye: false
     });
-  }
-  return matches;
+}
+
+function withChessColors(matches) {
+  return matches.map((match) => match.bye ? match : chessGame(match.player1Id, match.player2Id));
+}
+
+function chessGamePoints(match, playerId) {
+  if (match.draw) return 0.5;
+  return match.winnerId === playerId ? 1 : 0;
+}
+
+function chessThirdRound() {
+  const firstRound = state.rounds[0];
+  const secondRound = state.rounds[1];
+  const tiedIds = new Set();
+  const tieBreaks = [];
+
+  firstRound.matches.filter((match) => !match.bye).forEach((firstGame) => {
+    const secondGame = secondRound.matches.find((match) => !match.bye &&
+      ((match.player1Id === firstGame.player1Id && match.player2Id === firstGame.player2Id) ||
+       (match.player1Id === firstGame.player2Id && match.player2Id === firstGame.player1Id))
+    );
+    if (!secondGame) return;
+
+    const firstScore = chessGamePoints(firstGame, firstGame.player1Id) + chessGamePoints(secondGame, firstGame.player1Id);
+    const secondScore = chessGamePoints(firstGame, firstGame.player2Id) + chessGamePoints(secondGame, firstGame.player2Id);
+    if (firstScore !== secondScore) return;
+
+    tiedIds.add(firstGame.player1Id);
+    tiedIds.add(firstGame.player2Id);
+    tieBreaks.push(chessGame(firstGame.player1Id, firstGame.player2Id));
+  });
+
+  const remainingIds = rankedPlayers().map((player) => player.id).filter((id) => !tiedIds.has(id));
+  return [...tieBreaks, ...withChessColors(pairPlayers(remainingIds))];
 }
 
 function tournamentIsComplete() {
@@ -234,7 +267,7 @@ function startTournament(names, mode) {
   shuffled(state.players).forEach((player, index) => { player.seed = index; });
   state.rounds = [{
     number: 1,
-    matches: state.mode === "chess" ? chessRound(1) : pairPlayers(state.players.map((player) => player.id), true)
+    matches: state.mode === "chess" ? initialChessRound() : pairPlayers(state.players.map((player) => player.id), true)
   }];
   state.createdAt = new Date().toISOString();
   persist();
@@ -268,11 +301,20 @@ function selectDraw(roundIndex, matchId) {
 function createNextRound() {
   const current = state.rounds.at(-1);
   if (!current || !isRoundComplete(current) || state.rounds.length >= maximumRounds()) return;
+  const nextRoundNumber = state.rounds.length + 1;
+  let matches;
+  if (state.mode !== "chess") {
+    matches = pairPlayers(rankedPlayers().map((player) => player.id));
+  } else if (nextRoundNumber === 2) {
+    matches = chessReturnRound();
+  } else if (nextRoundNumber === 3) {
+    matches = chessThirdRound();
+  } else {
+    matches = withChessColors(pairPlayers(rankedPlayers().map((player) => player.id)));
+  }
   state.rounds.push({
-    number: state.rounds.length + 1,
-    matches: state.mode === "chess"
-      ? chessRound(state.rounds.length + 1)
-      : pairPlayers(rankedPlayers().map((player) => player.id))
+    number: nextRoundNumber,
+    matches
   });
   persist();
   renderTournament();
@@ -327,7 +369,11 @@ function renderTournament() {
   elements.roundMessage.textContent = finished
     ? `Nach ${roundLimit} Runden ist das Turnier beendet. Die Endplatzierung steht fest.`
     : complete
-      ? "Runde vollständig – die nächste Auslosung gruppiert nach Punkten."
+      ? state.mode === "chess" && current.number === 1
+        ? "Nächste Runde: dieselben Paarungen mit vertauschten Farben."
+        : state.mode === "chess" && current.number === 2
+          ? "Ausgeglichene Auftaktduelle erhalten ein Entscheidungsspiel; die übrigen Paarungen folgen dem Punktestand."
+          : "Runde vollständig – die nächste Auslosung gruppiert nach Punkten."
       : "Wähle in jeder Begegnung den Gewinner aus.";
   elements.tournamentMeta.textContent = `${state.players.length} Teilnehmende · ${state.rounds.length} von ${roundLimit} Runden`;
   elements.rankingTitle.textContent = finished ? "Endplatzierung" : "Tabelle";

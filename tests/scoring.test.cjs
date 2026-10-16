@@ -49,40 +49,59 @@ assert.deepEqual(
 
 console.log("Wertungstest bestanden: Sieg 1, Remis 0,5, Niederlage 0 Punkte.");
 
-const chessMatch = source.match(/function chessRound\(roundNumber\) \{[\s\S]*?\r?\n\}/);
-assert.ok(chessMatch, "Die Schach-Rundenauslosung wurde nicht gefunden.");
-const createChessRound = new Function("state", "uid", `${chessMatch[0]}; return chessRound;`)({
-  players: ["a", "b", "c", "d", "e"].map((id) => ({ id }))
-}, () => "match");
-const chessMatches = Array.from({ length: 10 }, (_, index) => createChessRound(index + 1)).flat();
-const pairs = new Map();
-chessMatches.filter((game) => !game.bye).forEach((game) => {
-  const pair = [game.whiteId, game.blackId].sort().join("|");
-  if (!pairs.has(pair)) pairs.set(pair, []);
-  pairs.get(pair).push([game.whiteId, game.blackId]);
-});
-assert.equal(pairs.size, 10, "Jedes Teilnehmerpaar soll vorkommen.");
-for (const games of pairs.values()) {
-  assert.equal(games.length, 2, "Jedes Teilnehmerpaar soll genau zweimal spielen.");
-  assert.deepEqual(games[0], [...games[1]].reverse(), "Die Rückrunde soll die Farben tauschen.");
-}
-assert.equal(chessMatches.filter((game) => game.bye).length, 10, "Bei fünf Teilnehmenden gibt es pro Runde ein Freilos.");
-
-const createEvenChessRound = new Function("state", "uid", `${chessMatch[0]}; return chessRound;`)({
-  players: ["a", "b", "c", "d"].map((id) => ({ id }))
-}, () => "match");
-const evenChessMatches = Array.from({ length: 6 }, (_, index) => createEvenChessRound(index + 1)).flat();
-const evenPairs = new Map();
-evenChessMatches.forEach((game) => {
-  assert.equal(game.bye, false, "Bei vier Teilnehmenden darf es kein Freilos geben.");
-  const pair = [game.whiteId, game.blackId].sort().join("|");
-  if (!evenPairs.has(pair)) evenPairs.set(pair, []);
-  evenPairs.get(pair).push([game.whiteId, game.blackId]);
-});
-assert.equal(evenPairs.size, 6, "Bei vier Teilnehmenden soll jedes Paar vorkommen.");
-for (const games of evenPairs.values()) {
-  assert.equal(games.length, 2, "Jedes gerade Teilnehmerpaar soll genau zweimal spielen.");
-  assert.deepEqual(games[0], [...games[1]].reverse(), "Auch bei gerader Teilnehmerzahl werden die Farben getauscht.");
+function functionSource(name) {
+  const match = source.match(new RegExp(`function ${name}\\([^)]*\\) \\{[\\s\\S]*?\\r?\\n\\}`));
+  assert.ok(match, `Die Funktion ${name} wurde nicht gefunden.`);
+  return match[0];
 }
 
-console.log("Schachtest bestanden: Doppelrundlauf mit Farbtausch.");
+const makeGame = (player1Id, player2Id) => ({
+  id: "generated", player1Id, player2Id, whiteId: player1Id, blackId: player2Id,
+  winnerId: null, draw: false, bye: false
+});
+const makeOpeningRounds = new Function("state", "uid", "shuffled", "chessGame", `
+  ${functionSource("initialChessRound")}
+  ${functionSource("chessReturnRound")}
+  return { initialChessRound, chessReturnRound };
+`)({ players: ["a", "b", "c", "d"].map((id) => ({ id })) }, () => "id", (ids) => ids, makeGame);
+const firstRound = makeOpeningRounds.initialChessRound();
+assert.equal(firstRound.length, 2, "Vier Teilnehmende sollen in Runde 1 zwei Paarungen bilden.");
+const returnedRound = new Function("state", "uid", functionSource("chessReturnRound") + "; return chessReturnRound();")(
+  { rounds: [{ matches: firstRound }] }, () => "return"
+);
+assert.equal(returnedRound.length, firstRound.length);
+firstRound.forEach((game) => {
+  const returnGame = returnedRound.find((candidate) =>
+    candidate.player1Id === game.player2Id && candidate.player2Id === game.player1Id
+  );
+  assert.ok(returnGame, "Runde 2 muss dieselben Gegner mit vertauschten Farben enthalten.");
+  assert.equal(returnGame.whiteId, game.blackId);
+  assert.equal(returnGame.blackId, game.whiteId);
+});
+
+const players = ["a", "b", "c", "d", "e", "f"].map((id) => ({ id }));
+const roundOne = { matches: [
+  { player1Id: "a", player2Id: "b", winnerId: "a", draw: false, bye: false },
+  { player1Id: "c", player2Id: "d", winnerId: "c", draw: false, bye: false },
+  { player1Id: "e", player2Id: "f", winnerId: null, draw: true, bye: false }
+] };
+const roundTwo = { matches: [
+  { player1Id: "b", player2Id: "a", winnerId: "a", draw: false, bye: false },
+  { player1Id: "d", player2Id: "c", winnerId: "c", draw: false, bye: false },
+  { player1Id: "f", player2Id: "e", winnerId: null, draw: true, bye: false }
+] };
+let swissPool;
+const swissPairings = (ids) => {
+  swissPool = [...ids];
+  return [makeGame(ids[0], ids[1]), makeGame(ids[2], ids[3])];
+};
+const thirdRound = new Function("state", "rankedPlayers", "pairPlayers", "withChessColors", "chessGame", "chessGamePoints", `
+  ${functionSource("chessGamePoints")}
+  ${functionSource("chessThirdRound")}
+  return chessThirdRound();
+`)({ players, rounds: [roundOne, roundTwo] }, () => players.map((player) => player), swissPairings, (games) => games, makeGame);
+assert.deepEqual(swissPool.sort(), ["a", "b", "c", "d"]);
+assert.ok(thirdRound.some((game) => new Set([game.player1Id, game.player2Id]).has("e") && new Set([game.player1Id, game.player2Id]).has("f")), "Das ausgeglichene Duell erhält ein Entscheidungsspiel.");
+assert.equal(thirdRound.length, 3, "Nicht ausgeglichene Duelle laufen in der dritten Runde in die Schweizer Auslosung.");
+
+console.log("Schachtest bestanden: feste Rückrunde, Entscheidungsspiel und Schweizer Paarungen.");
